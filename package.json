@@ -3,19 +3,22 @@
   "version": "1.0.0",
   "main": "index.js",
   "license": "MIT",
+  "type": "module",
   "scripts": {
     "build": "tsc",
     "start": "tsc && node dist/index.js"
   },
+  "bin": {
+    "pods": "/dist/index.js"
+  },
   "dependencies": {
-    "chalk": "^4.1.2",
-    "commander": "^10.0.0",
+    "chalk": "^5.2.0",
+    "commander": "^10.0.1",
     "expect": "^29.5.0",
-    "ora": "^3.2.0",
+    "ora": "^6.3.0",
     "typescript": "^5.0.4"
   },
   "devDependencies": {
-    "@types/node": "^18.15.11",
-    "@types/ora": "^3.2.0"
+    "@types/node": "^18.15.11"
   }
 }

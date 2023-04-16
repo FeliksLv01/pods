@@ -19,19 +19,15 @@ export default async function create(name: string) {
     return
   }
 
-  const spinner = ora(chalk.greenBright(`Cloning template into ${name}`)).start()
+  const spinner = ora(`cloning template into ${chalk.greenBright(name)}`).start()
 
   const command = spawn('pod', ['lib', 'create', name, '--template-url=git@github.com:FeliksLv01/pod-template.git'])
   command.stdout.on('data', (data: Buffer) => {
     const msg = data.toString()
     if (msg.startsWith('Configuring')) {
-      spinner.text = chalk.blueBright('start generating')
+      spinner.text = chalk.blueBright('start project configuration')
     }
   })
-  command.on('error', error => {
-    spinner.fail(chalk.red(error.message))
-  })
-  command.on('close', _ => {
-    spinner.succeed(chalk.greenBright('finished'))
-  })
+  command.on('error', error => spinner.fail(chalk.red(error.message)))
+  command.on('close', () => spinner.succeed(`create ${chalk.cyanBright(name)} successfully!🎉🎉🎉`))
 }
