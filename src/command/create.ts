@@ -1,16 +1,7 @@
 import chalk from 'chalk'
 import { spawn } from 'child_process'
-import { access } from 'fs/promises'
 import ora from 'ora'
-
-const precheck = async (name: string): Promise<boolean> => {
-  try {
-    await access(name)
-    return false
-  } catch {
-    return true
-  }
-}
+import { precheck } from '../util.js'
 
 export default async function create(name: string) {
   const isValid = await precheck(name)
@@ -29,5 +20,5 @@ export default async function create(name: string) {
     }
   })
   command.on('error', error => spinner.fail(chalk.red(error.message)))
-  command.on('close', () => spinner.succeed(`create ${chalk.cyanBright(name)} successfully!🎉🎉🎉`))
+  command.on('close', () => spinner.succeed(`create pod ${chalk.cyanBright(name)} successfully!🎉🎉🎉`))
 }
