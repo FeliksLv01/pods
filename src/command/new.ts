@@ -1,70 +1,95 @@
-import { readdirSync, existsSync, mkdirSync, lstatSync, copyFileSync } from 'fs'
 import path from 'path'
-import { promisify } from 'util'
-import { exec, spawn } from 'child_process'
-import { precheck } from '../util.js'
+import ejs from 'ejs'
+import fs from 'fs-extra'
 import chalk from 'chalk'
 import ora from 'ora'
 
-// 定义复制文件夹的函数
-function copyFolderSync(source: string, target: string) {
-  if (!existsSync(target)) {
-    mkdirSync(target)
-  }
+// 异步地复制文件
+const copyFile = (srcPath: string, destPath: string) => {
+  return fs.promises.copyFile(srcPath, destPath)
+}
 
-  // 获取源文件夹中的所有文件
-  const files = readdirSync(source)
+// 异步地创建文件夹
+const mkdir = (dirPath: string) => {
+  return fs.promises.mkdir(dirPath, { recursive: true })
+}
 
-  files.forEach(function (file) {
-    const curSource = path.join(source, file)
-    const curTarget = path.join(target, file)
+// 异步地复制模版文件夹中的所有文件和子文件夹到目标目录
+const copyFiles = async (srcDir: string, destDir: string) => {
+  // 读取源目录中的所有文件和文件夹
+  const files = await fs.promises.readdir(srcDir)
 
-    if (lstatSync(curSource).isDirectory()) {
-      // 如果是文件夹则递归调用
-      copyFolderSync(curSource, curTarget)
+  // 遍历所有文件和文件夹
+  for (const file of files) {
+    // 构造源文件路径和目标文件路径
+    const srcPath = path.join(srcDir, file)
+    const destPath = path.join(destDir, file)
+
+    // 获取文件的状态信息
+    const stat = await fs.promises.stat(srcPath)
+
+    if (stat.isDirectory()) {
+      // 如果是文件夹，递归处理文件夹下的所有文件和子文件夹
+      await mkdir(destPath)
+      await copyFiles(srcPath, destPath)
     } else {
-      // 如果是文件则直接复制
-      copyFileSync(curSource, curTarget)
+      // 如果是文件，复制文件到目标目录
+      await copyFile(srcPath, destPath)
     }
-  })
+  }
 }
 
-const execPromise = promisify(exec)
+// 复制模版文件夹到目标目录
+const createProject = async (projectName: string) => {
+  const srcDir = path.join(__dirname, 'template')
+  const destDir = path.join(process.cwd(), projectName)
 
-async function gitClone(url: string, dest: string, branch?: string): Promise<void> {
-  const cloneCommand = `git clone ${branch ? `--branch ${branch} ` : ''}${url} ${dest}`
-  await execPromise(cloneCommand)
+  await mkdir(destDir)
+  await copyFiles(srcDir, destDir)
+
+  console.log(`Created project "${projectName}" successfully.`)
 }
 
-// 调用函数复制文件夹
-
-// const newProject = (name: string) => {
-// gitClone('https://github.com/user/repo.git', '/path/to/destination', 'my-branch')
-//   .then(() => console.log('Git clone complete'))
-//   .catch(error => console.error('Git clone failed', error))
-// }
-
-export default async function newProject(name: string) {
-  const isValid = await precheck(name)
-  if (!isValid) {
-    console.error(chalk.red(`目标路径 '${name}' 已经存在。`))
+export default async function newProject(tplPath: string, projectName: string) {
+  // 获取项目路径
+  const projectPath = path.join(process.cwd(), projectName)
+  // 判断项目路径是否存在
+  if (fs.existsSync(projectPath)) {
+    console.error(chalk.red(`目标路径 '${projectName}' 已经存在。`))
     return
   }
 
-  const spinner = ora(`cloning template into ${chalk.greenBright(name)}`).start()
+  const spinner = ora(`Creating project ${chalk.greenBright(projectName)}`).start()
 
-  const command = spawn('pod', [
-    'lib',
-    'create',
-    name,
-    '--template-url=https://gitee.com/felikslv/project-template.git',
-  ])
-  command.stdout.on('data', (data: Buffer) => {
-    const msg = data.toString()
-    if (msg.startsWith('Configuring')) {
-      spinner.text = chalk.blueBright('start project configuration')
-    }
-  })
-  command.on('error', error => spinner.fail(chalk.red(error.message)))
-  command.on('close', () => spinner.succeed(`create ${chalk.cyanBright(name)} successfully!🎉🎉🎉`))
+  // 获取模版文件列表
+  const tplFiles = await fs.readdir(tplPath)
+  // 读取模版文件并替换变量
+  const tplData = await Promise.all(
+    tplFiles.map(async file => {
+      const filePath = path.join(tplPath, file)
+      const stats = await fs.stat(filePath)
+      // 判断是否是文件夹
+      if (stats.isDirectory()) return
+      // 读取文件内容
+      let content = await fs.readFile(filePath, 'utf-8')
+      // 替换变量
+      content = ejs.render(content, { projectName })
+      return {
+        filePath: path.join(projectPath, file),
+        content,
+      }
+    })
+  )
+
+  spinner.text = chalk.blueBright('start project configuration')
+  await Promise.all(
+    tplData.map(async data => {
+      if (!data) return
+      await fs.ensureDir(path.dirname(data.filePath))
+      await fs.writeFile(data.filePath, data.content)
+    })
+  )
+
+  // 结束生成项目
+  spinner.succeed(`Projec generated ${chalk.cyanBright(projectName)} successfully!🎉🎉🎉`)
 }

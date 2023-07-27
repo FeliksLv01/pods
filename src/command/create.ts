@@ -1,11 +1,14 @@
 import chalk from 'chalk'
 import { spawn } from 'child_process'
 import ora from 'ora'
-import { precheck } from '../util.js'
+import path from 'path'
+import fs from 'fs-extra'
 
 export default async function create(name: string) {
-  const isValid = await precheck(name)
-  if (!isValid) {
+  // 获取项目路径
+  const projectPath = path.join(process.cwd(), name)
+  // 判断项目路径是否存在
+  if (fs.existsSync(projectPath)) {
     console.error(chalk.red(`目标路径 '${name}' 已经存在。`))
     return
   }

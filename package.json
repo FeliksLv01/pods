@@ -14,11 +14,15 @@
   "dependencies": {
     "chalk": "^5.2.0",
     "commander": "^10.0.1",
+    "ejs": "^3.1.9",
     "expect": "^29.5.0",
+    "fs-extra": "^11.1.1",
     "ora": "^6.3.0",
     "typescript": "^5.0.4"
   },
   "devDependencies": {
+    "@types/ejs": "^3.1.2",
+    "@types/fs-extra": "^11.0.1",
     "@types/node": "^18.15.11"
   }
 }
