@@ -3,54 +3,94 @@ import ejs from 'ejs'
 import fs from 'fs-extra'
 import chalk from 'chalk'
 import ora from 'ora'
+import { spawn, exec } from 'child_process'
 
-// 异步地复制文件
-const copyFile = (srcPath: string, destPath: string) => {
-  return fs.promises.copyFile(srcPath, destPath)
+interface TemplateFile {
+  name: string
+  path: string
+  isDirectory: boolean
 }
 
-// 异步地创建文件夹
-const mkdir = (dirPath: string) => {
-  return fs.promises.mkdir(dirPath, { recursive: true })
+async function createProject(
+  projectName: string,
+  templatePath: string,
+  outputPath: string,
+  userName: string
+): Promise<void> {
+  const templateFiles = getTemplateFiles(templatePath)
+  await copyTemplateFiles(templateFiles, projectName, templatePath, outputPath, userName)
 }
 
-// 异步地复制模版文件夹中的所有文件和子文件夹到目标目录
-const copyFiles = async (srcDir: string, destDir: string) => {
-  // 读取源目录中的所有文件和文件夹
-  const files = await fs.promises.readdir(srcDir)
+function getTemplateFiles(templatePath: string): TemplateFile[] {
+  const templateFiles: TemplateFile[] = []
+  const files = fs.readdirSync(templatePath)
 
-  // 遍历所有文件和文件夹
   for (const file of files) {
-    // 构造源文件路径和目标文件路径
-    const srcPath = path.join(srcDir, file)
-    const destPath = path.join(destDir, file)
+    const filePath = path.join(templatePath, file)
+    const stats = fs.statSync(filePath)
 
-    // 获取文件的状态信息
-    const stat = await fs.promises.stat(srcPath)
+    templateFiles.push({
+      name: file,
+      path: filePath,
+      isDirectory: stats.isDirectory(),
+    })
+  }
 
-    if (stat.isDirectory()) {
-      // 如果是文件夹，递归处理文件夹下的所有文件和子文件夹
-      await mkdir(destPath)
-      await copyFiles(srcPath, destPath)
+  return templateFiles
+}
+
+async function copyTemplateFiles(
+  templateFiles: TemplateFile[],
+  projectName: string,
+  templatePath: string,
+  outputPath: string,
+  userName: string
+): Promise<void> {
+  for (const templateFile of templateFiles) {
+    const outputFilePath = getOutputFilePath(templateFile, projectName, templatePath, outputPath)
+
+    if (templateFile.isDirectory) {
+      await fs.promises.mkdir(outputFilePath)
+      const subTemplateFiles = getTemplateFiles(templateFile.path)
+      await copyTemplateFiles(subTemplateFiles, projectName, templateFile.path, outputFilePath, userName)
     } else {
-      // 如果是文件，复制文件到目标目录
-      await copyFile(srcPath, destPath)
+      const fileContent = await fs.promises.readFile(templateFile.path, 'utf-8')
+      const renderedContent = ejs.render(fileContent, { projectName: projectName, projectOwner: userName })
+      await fs.promises.writeFile(outputFilePath, renderedContent, 'utf-8')
     }
   }
 }
 
-// 复制模版文件夹到目标目录
-const createProject = async (projectName: string) => {
-  const srcDir = path.join(__dirname, 'template')
-  const destDir = path.join(process.cwd(), projectName)
-
-  await mkdir(destDir)
-  await copyFiles(srcDir, destDir)
-
-  console.log(`Created project "${projectName}" successfully.`)
+function getOutputFilePath(
+  templateFile: TemplateFile,
+  projectName: string,
+  templatePath: string,
+  outputPath: string
+): string {
+  const relativePath = path.relative(templatePath, templateFile.path)
+  const renderedPath = relativePath.replace('PROJECTTEMP', projectName)
+  return path.join(outputPath, renderedPath)
 }
 
-export default async function newProject(tplPath: string, projectName: string) {
+function getGitUserName(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    exec('git config user.name', (err, stdout, stderr) => {
+      if (err) {
+        reject(err)
+      }
+      if (stderr) {
+        reject(stderr)
+      }
+      resolve(stdout.trim())
+    })
+  })
+}
+
+// const delay = (ms: number) => {
+//   return new Promise(resolve => setTimeout(resolve, ms))
+// }
+
+export default async function newProject(templatePath: string, projectName: string) {
   // 获取项目路径
   const projectPath = path.join(process.cwd(), projectName)
   // 判断项目路径是否存在
@@ -61,35 +101,21 @@ export default async function newProject(tplPath: string, projectName: string) {
 
   const spinner = ora(`Creating project ${chalk.greenBright(projectName)}`).start()
 
-  // 获取模版文件列表
-  const tplFiles = await fs.readdir(tplPath)
-  // 读取模版文件并替换变量
-  const tplData = await Promise.all(
-    tplFiles.map(async file => {
-      const filePath = path.join(tplPath, file)
-      const stats = await fs.stat(filePath)
-      // 判断是否是文件夹
-      if (stats.isDirectory()) return
-      // 读取文件内容
-      let content = await fs.readFile(filePath, 'utf-8')
-      // 替换变量
-      content = ejs.render(content, { projectName })
-      return {
-        filePath: path.join(projectPath, file),
-        content,
-      }
-    })
-  )
-
+  await fs.promises.mkdir(projectPath)
   spinner.text = chalk.blueBright('start project configuration')
-  await Promise.all(
-    tplData.map(async data => {
-      if (!data) return
-      await fs.ensureDir(path.dirname(data.filePath))
-      await fs.writeFile(data.filePath, data.content)
-    })
-  )
 
-  // 结束生成项目
-  spinner.succeed(`Projec generated ${chalk.cyanBright(projectName)} successfully!🎉🎉🎉`)
+  const userName = (await getGitUserName()) ?? 'Pods CLI'
+
+  await createProject(projectName, templatePath, projectPath, userName)
+
+  const command = spawn('pod', ['install'], {
+    cwd: projectPath,
+    shell: true,
+  })
+  command.stdout.on('data', (data: Buffer) => {
+    console.log(data.toString())
+    spinner.text = chalk.blueBright('pod installing ...')
+  })
+  command.on('error', error => spinner.fail(chalk.red(error.message)))
+  command.on('close', () => spinner.succeed(`Projec generated ${chalk.cyanBright(projectName)} successfully!🎉🎉🎉`))
 }

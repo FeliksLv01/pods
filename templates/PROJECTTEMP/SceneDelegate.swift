@@ -2,7 +2,7 @@
 //  SceneDelegate.swift
 //  <%= projectName %>
 //
-//  Created by PROJECT_OWNER on TODAYS_DATE.
+//  Created by <%= projectOwner %> on TODAYS_DATE.
 //
 
 import UIKit
