@@ -10,10 +10,7 @@ const push = (name: string) => {
 		'push',
 		'UniSpecs',
 		`${name}.podspec`,
-		'--verbose',
 		'--allow-warnings',
-		'--use-libraries',
-		'--use-modular-headers',
 		'--skip-import-validation',
 		'--skip-tests',
 	]);
