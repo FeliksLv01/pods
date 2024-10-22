@@ -1,5 +1,3 @@
-import chalk from 'chalk';
-import ora from 'ora';
 import { spawn } from 'child_process';
 
 const push = (name: string) => {
@@ -7,7 +5,6 @@ const push = (name: string) => {
 		console.log('error: name is null');
 		return;
 	}
-	const spinner = ora(`Building ${chalk.greenBright(name)}`).start();
 	const command = spawn('pod', [
 		'repo',
 		'push',
@@ -23,8 +20,10 @@ const push = (name: string) => {
 		const msg = data.toString();
 		console.log(msg);
 	});
-	command.on('error', (error) => spinner.fail(chalk.red(error.message)));
-	command.on('close', () => {});
+	command.on('error', (error) => console.log(error.message));
+	command.on('close', () => {
+		console.log('end');
+	});
 };
 
 export default push;
