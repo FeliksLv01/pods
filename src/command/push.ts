@@ -19,20 +19,12 @@ const push = (name: string) => {
 		'--use-modular-headers',
 		'--skip-tests',
 	]);
-	const keyWords = [
-		'Testing with `xcodebuild`',
-		"Updating the `UniSpecs' repo",
-		"Adding the spec to the `UniSpecs' repo",
-		"Pushing the `UniSpecs' repo",
-	];
 	command.stdout.on('data', (data: Buffer) => {
 		const msg = data.toString();
-		if (keyWords.some((keyWord) => msg.includes(keyWord))) {
-			spinner.text = chalk.blueBright(msg);
-		}
+		console.log(msg);
 	});
 	command.on('error', (error) => spinner.fail(chalk.red(error.message)));
-	command.on('close', () => spinner.succeed(`Pushed ${chalk.cyanBright(name)} successfully!🎉🎉🎉`));
+	command.on('close', () => {});
 };
 
 export default push;
