@@ -14,6 +14,7 @@ const push = (name: string) => {
 		'--allow-warnings',
 		'--use-libraries',
 		'--use-modular-headers',
+		'--skip-import-validation',
 		'--skip-tests',
 	]);
 	command.stdout.on('data', (data: Buffer) => {
